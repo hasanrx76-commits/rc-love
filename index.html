@@ -664,7 +664,7 @@ tailwind.config = {
       document.body.style.overflow = 'auto';
       document.body.classList.remove('overflow-hidden');
       document.body.style.overflowY = 'auto';
-      setStore('love_site_unlocked', true);
+      setStore('rc_love_v2_unlocked', true);
       startPetalAnimation();
     } else {
       passwordError.classList.remove('hidden');
@@ -675,7 +675,7 @@ tailwind.config = {
   };
 
   // Check if already unlocked
-  if (getStore('love_site_unlocked', false)) {
+  if (getStore('rc_love_v2_unlocked', false)) {
     passwordScreen.style.display = 'none';
     passwordScreen.style.visibility = 'hidden';
     passwordScreen.remove();
