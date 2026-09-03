@@ -9,6 +9,22 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBJ6Jpug20GAnh4P4PspJ4-9Lfcgem6e9s",
+  authDomain: "love-sites-786.firebaseapp.com",
+  databaseURL: "https://love-sites-786-default-rtdb.firebaseio.com",
+  projectId: "love-sites-786",
+  storageBucket: "love-sites-786.firebasestorage.app",
+  messagingSenderId: "717844527008",
+  appId: "1:717844527008:web:ca890f82dfb460675c96c5"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const SITE = 'rabbani_chandni';
+</script>
 <script>
 tailwind.config = {
   theme: {
@@ -639,12 +655,24 @@ tailwind.config = {
 (function() {
   'use strict';
 
-  // ===== STORAGE HELPERS =====
-  function getStore(key, fallback) {
-    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
-    catch(e) { return fallback; }
+  function compressImage(file, maxWidth, quality) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          let w = img.width, h = img.height;
+          if (w > maxWidth) { h = h * maxWidth / w; w = maxWidth; }
+          canvas.width = w; canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
   }
-  function setStore(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch(e) {} }
 
   // ===== PASSWORD =====
   const CORRECT_PASSWORD = '1215225';
@@ -664,7 +692,6 @@ tailwind.config = {
       document.body.style.overflow = 'auto';
       document.body.classList.remove('overflow-hidden');
       document.body.style.overflowY = 'auto';
-      setStore('rc_love_v2_unlocked', true);
       startPetalAnimation();
     } else {
       passwordError.style.display = 'block';
@@ -672,20 +699,6 @@ tailwind.config = {
       passwordInput.focus();
     }
   };
-
-  // Check if already unlocked
-  if (getStore('rc_love_v2_unlocked', false)) {
-    passwordScreen.style.display = 'none';
-    passwordScreen.style.visibility = 'hidden';
-    passwordScreen.remove();
-    mainContent.style.display = 'block';
-    mainContent.style.visibility = 'visible';
-    mainContent.classList.remove('hidden');
-    document.body.style.overflow = 'auto';
-    document.body.classList.remove('overflow-hidden');
-    document.body.style.overflowY = 'auto';
-    startPetalAnimation();
-  }
 
   // ===== NAVIGATION =====
   const navBtns = document.querySelectorAll('.nav-btn');
@@ -700,10 +713,7 @@ tailwind.config = {
     window.scrollTo(0, 0);
   }
   window.navigateTo = navigateTo;
-
-  navBtns.forEach(btn => {
-    btn.addEventListener('click', () => navigateTo(btn.dataset.page));
-  });
+  navBtns.forEach(btn => btn.addEventListener('click', () => navigateTo(btn.dataset.page)));
 
   // ===== COVER PHOTO =====
   const coverDisplay = document.getElementById('coverDisplay');
@@ -713,10 +723,9 @@ tailwind.config = {
   const deleteCoverBtn = document.getElementById('deleteCoverBtn');
   const coverFileInput = document.getElementById('coverFileInput');
 
-  function loadCoverPhoto() {
-    const photo = getStore('cover_photo', null);
-    if (photo) {
-      coverImage.src = photo;
+  db.ref(SITE + '/cover_photo').on('snap', s => {
+    if (s.exists()) {
+      coverImage.src = s.val();
       coverImage.classList.remove('hidden');
       coverPlaceholder.classList.add('hidden');
       deleteCoverBtn.classList.remove('hidden');
@@ -725,37 +734,21 @@ tailwind.config = {
       coverPlaceholder.classList.remove('hidden');
       deleteCoverBtn.classList.add('hidden');
     }
-  }
+  });
 
   coverDisplay.addEventListener('click', function(e) {
-    if (e.target === coverImage || e.target === coverPlaceholder || e.target.closest('#coverPlaceholder')) {
-      coverFileInput.click();
-    }
+    if (e.target === coverImage || e.target === coverPlaceholder || e.target.closest('#coverPlaceholder')) coverFileInput.click();
   });
-
-  changeCoverBtn.addEventListener('click', function(e) {
-    e.stopPropagation();
-    coverFileInput.click();
+  changeCoverBtn.addEventListener('click', function(e) { e.stopPropagation(); coverFileInput.click(); });
+  coverFileInput.addEventListener('change', async function() {
+    const file = this.files[0]; if (!file) return;
+    const dataUrl = await compressImage(file, 800, 0.7);
+    db.ref(SITE + '/cover_photo').set(dataUrl);
   });
-
-  coverFileInput.addEventListener('change', function() {
-    const file = this.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(ev) {
-      setStore('cover_photo', ev.target.result);
-      loadCoverPhoto();
-    };
-    reader.readAsDataURL(file);
-  });
-
   deleteCoverBtn.addEventListener('click', function(e) {
     e.stopPropagation();
-    localStorage.removeItem('cover_photo');
-    loadCoverPhoto();
+    db.ref(SITE + '/cover_photo').remove();
   });
-
-  loadCoverPhoto();
 
   // ===== COUNTDOWN TIMER =====
   const countDays = document.getElementById('countDays');
@@ -768,26 +761,21 @@ tailwind.config = {
   const countdownDate = document.getElementById('countdownDate');
   const saveCountdownBtn = document.getElementById('saveCountdownBtn');
 
-  function getCountdownStart() {
-    return getStore('countdown_start', '2025-06-15');
-  }
+  let countdownStart = '2025-06-15';
+  db.ref(SITE + '/countdown_start').on('snap', s => {
+    if (s.exists()) countdownStart = s.val();
+    updateCountdown();
+  });
 
   function updateCountdown() {
-    const start = new Date(getCountdownStart());
+    const start = new Date(countdownStart);
     const now = new Date();
     let diff = now - start;
     if (diff < 0) {
       countdownLabel.textContent = 'Counting down to our day...';
       diff = start - now;
-      const d = Math.floor(diff / 86400000);
-      const h = Math.floor((diff % 86400000) / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      countDays.textContent = d;
-      countHours.textContent = h;
-      countMins.textContent = m;
-      countSecs.textContent = s;
-      return;
+    } else {
+      countdownLabel.textContent = 'Since we fell in love';
     }
     const d = Math.floor(diff / 86400000);
     const h = Math.floor((diff % 86400000) / 3600000);
@@ -797,21 +785,16 @@ tailwind.config = {
     countHours.textContent = h;
     countMins.textContent = m;
     countSecs.textContent = s;
-    countdownLabel.textContent = 'Since we fell in love';
   }
-
   updateCountdown();
   setInterval(updateCountdown, 1000);
-
   editCountdownBtn.addEventListener('click', function() {
-    countdownDate.value = getCountdownStart();
+    countdownDate.value = countdownStart;
     countdownModal.classList.remove('hidden');
   });
-
   saveCountdownBtn.addEventListener('click', function() {
     if (countdownDate.value) {
-      setStore('countdown_start', countdownDate.value);
-      updateCountdown();
+      db.ref(SITE + '/countdown_start').set(countdownDate.value);
       countdownModal.classList.add('hidden');
     }
   });
@@ -829,7 +812,8 @@ tailwind.config = {
     { text: "Dil ki har dhadkan bas tumhara naam leti hai.", lang: "Hinglish" }
   ];
 
-  let currentQuote = getStore('quote_index', 0);
+  let currentQuote = 0;
+  db.ref(SITE + '/quote_index').on('snap', s => { if (s.exists()) { currentQuote = s.val(); renderQuote(); } });
   const quoteText = document.getElementById('quoteText');
   const quoteLang = document.getElementById('quoteLang');
   const quoteLikeBtn = document.getElementById('quoteLikeBtn');
@@ -840,39 +824,23 @@ tailwind.config = {
     const q = quotes[currentQuote % quotes.length];
     quoteText.textContent = q.text;
     quoteLang.textContent = '- ' + q.lang;
-    const likes = getStore('quote_likes_' + (currentQuote % quotes.length), 0);
-    quoteLikeCount.textContent = likes;
-    const liked = getStore('quote_liked_' + (currentQuote % quotes.length), false);
-    const icon = quoteLikeBtn.querySelector('.material-symbols-outlined');
-    if (liked) {
-      icon.classList.add('fill-heart');
-    } else {
-      icon.classList.remove('fill-heart');
-    }
   }
-
   quoteNextBtn.addEventListener('click', function() {
     currentQuote++;
-    setStore('quote_index', currentQuote);
+    db.ref(SITE + '/quote_index').set(currentQuote);
     renderQuote();
   });
-
   quoteLikeBtn.addEventListener('click', function() {
     const idx = currentQuote % quotes.length;
-    const key = 'quote_likes_' + idx;
-    const likedKey = 'quote_liked_' + idx;
-    let liked = getStore(likedKey, false);
-    let likes = getStore(key, 0);
-    if (!liked) {
-      likes++;
-      liked = true;
-    } else {
-      likes--;
-      liked = false;
+    const ref = db.ref(SITE + '/quote_likes/' + idx);
+    ref.transaction(function(current) { return (current || 0) + 1; });
+  });
+  db.ref(SITE + '/quote_likes').on('value', snap => {
+    if (snap.exists()) {
+      const likes = snap.val();
+      const idx = currentQuote % quotes.length;
+      quoteLikeCount.textContent = likes[idx] || 0;
     }
-    setStore(key, likes);
-    setStore(likedKey, liked);
-    renderQuote();
   });
 
   renderQuote();
@@ -887,34 +855,23 @@ tailwind.config = {
 
   const defaultLetter = "My dearest Chandni,\n\nEvery day with you is a gift I never knew I needed. Your smile lights up my darkest days, and your love gives me strength I never knew I had.\n\nYou are my best friend, my soulmate, my everything. I promise to love you endlessly, to hold your hand through every storm, and to cherish every single moment we share together.\n\nForever and always,\nRabbani";
 
-  function loadLetter() {
-    const letter = getStore('love_letter', defaultLetter);
+  db.ref(SITE + '/love_letter').on('snap', s => {
+    const letter = s.exists() ? s.val() : defaultLetter;
     letterPreview.textContent = letter;
     letterText.value = letter;
-  }
-
-  readLetterBtn.addEventListener('click', function() {
-    letterModal.classList.remove('hidden');
   });
 
-  editLetterBtn.addEventListener('click', function() {
-    letterModal.classList.remove('hidden');
-    letterText.focus();
-  });
-
+  readLetterBtn.addEventListener('click', function() { letterModal.classList.remove('hidden'); });
+  editLetterBtn.addEventListener('click', function() { letterModal.classList.remove('hidden'); letterText.focus(); });
   saveLetterBtn.addEventListener('click', function() {
-    setStore('love_letter', letterText.value);
-    loadLetter();
+    db.ref(SITE + '/love_letter').set(letterText.value);
     letterModal.classList.add('hidden');
   });
-
-  loadLetter();
 
   // ===== MODAL CLOSE =====
   document.querySelectorAll('[data-close]').forEach(el => {
     el.addEventListener('click', function() {
-      const id = this.dataset.close;
-      document.getElementById(id).classList.add('hidden');
+      document.getElementById(this.dataset.close).classList.add('hidden');
     });
   });
 
@@ -926,7 +883,18 @@ tailwind.config = {
     { title: "Nikkah", subtitle: "Forever Bound", desc: "The sacred day when two souls become one in the eyes of Allah. Our forever begins here.", photo: null }
   ];
 
-  let milestones = getStore('story_milestones', defaultMilestones);
+  let milestones = [];
+
+  db.ref(SITE + '/story_milestones').on('snap', s => {
+    if (s.exists()) {
+      const data = s.val();
+      milestones = Array.isArray(data) ? data : Object.values(data);
+    } else {
+      milestones = [...defaultMilestones];
+      db.ref(SITE + '/story_milestones').set(milestones);
+    }
+    renderTimeline();
+  });
 
   function renderTimeline() {
     const container = document.getElementById('storyTimeline');
@@ -934,7 +902,6 @@ tailwind.config = {
     const wrapper = document.createElement('div');
     wrapper.className = 'relative';
     wrapper.innerHTML = '<div class="timeline-line"></div>';
-
     milestones.forEach((m, i) => {
       const div = document.createElement('div');
       div.className = 'relative pl-12 pb-8';
@@ -948,18 +915,12 @@ tailwind.config = {
           <button class="edit-milestone-btn mt-3 px-3 py-1 bg-surface-container-high rounded-lg text-[10px] text-on-surface-variant font-medium" data-idx="${i}">
             <span class="material-symbols-outlined text-xs align-middle">edit</span> Edit
           </button>
-        </div>
-      `;
+        </div>`;
       wrapper.appendChild(div);
     });
     container.appendChild(wrapper);
-
-    // Edit buttons
     document.querySelectorAll('.edit-milestone-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const idx = parseInt(this.dataset.idx);
-        openMilestoneEdit(idx);
-      });
+      btn.addEventListener('click', function() { openMilestoneEdit(parseInt(this.dataset.idx)); });
     });
   }
 
@@ -972,29 +933,19 @@ tailwind.config = {
     document.getElementById('editMilestoneModal').classList.remove('hidden');
   }
 
-  document.getElementById('saveMilestoneBtn').addEventListener('click', function() {
+  document.getElementById('saveMilestoneBtn').addEventListener('click', async function() {
     const idx = parseInt(document.getElementById('editMilestoneIdx').value);
     milestones[idx].title = document.getElementById('editMilestoneTitle').value;
     milestones[idx].subtitle = document.getElementById('editMilestoneSubtitle').value;
     milestones[idx].desc = document.getElementById('editMilestoneDesc').value;
     const file = document.getElementById('editMilestonePhoto').files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = function(ev) {
-        milestones[idx].photo = ev.target.result;
-        setStore('story_milestones', milestones);
-        renderTimeline();
-        document.getElementById('editMilestoneModal').classList.add('hidden');
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setStore('story_milestones', milestones);
-      renderTimeline();
-      document.getElementById('editMilestoneModal').classList.add('hidden');
+      milestones[idx].photo = await compressImage(file, 600, 0.7);
     }
+    db.ref(SITE + '/story_milestones').set(milestones);
+    document.getElementById('editMilestoneModal').classList.add('hidden');
   });
 
-  // Add Memory
   const addMemoryBtn = document.getElementById('addMemoryBtn');
   const memoryModal = document.getElementById('memoryModal');
   const saveMemoryBtn = document.getElementById('saveMemoryBtn');
@@ -1007,37 +958,22 @@ tailwind.config = {
     memoryModal.classList.remove('hidden');
   });
 
-  saveMemoryBtn.addEventListener('click', function() {
+  saveMemoryBtn.addEventListener('click', async function() {
     const title = document.getElementById('memoryTitle').value.trim();
     const subtitle = document.getElementById('memorySubtitle').value.trim();
     const desc = document.getElementById('memoryDesc').value.trim();
     if (!title) { alert('Please enter a title'); return; }
     const file = document.getElementById('memoryPhoto').files[0];
     const newMilestone = { title, subtitle: subtitle || 'A Special Memory', desc: desc || '', photo: null };
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = function(ev) {
-        newMilestone.photo = ev.target.result;
-        milestones.push(newMilestone);
-        setStore('story_milestones', milestones);
-        renderTimeline();
-        memoryModal.classList.add('hidden');
-      };
-      reader.readAsDataURL(file);
-    } else {
-      milestones.push(newMilestone);
-      setStore('story_milestones', milestones);
-      renderTimeline();
-      memoryModal.classList.add('hidden');
-    }
+    if (file) newMilestone.photo = await compressImage(file, 600, 0.7);
+    milestones.push(newMilestone);
+    db.ref(SITE + '/story_milestones').set(milestones);
+    memoryModal.classList.add('hidden');
   });
 
-  renderTimeline();
-
   // ===== MOMENTS GALLERY =====
-  let moments = getStore('moments_gallery', []);
+  let moments = [];
   let momentFilter = 'all';
-
   const galleryGrid = document.getElementById('galleryGrid');
   const galleryEmpty = document.getElementById('galleryEmpty');
   const uploadMomentBtn = document.getElementById('uploadMomentBtn');
@@ -1051,35 +987,23 @@ tailwind.config = {
   const uploadFeaturedBtn = document.getElementById('uploadFeaturedBtn');
   const featuredFileInput = document.getElementById('featuredFileInput');
 
-  // Featured photo
-  function loadFeatured() {
-    const photo = getStore('featured_photo', null);
-    if (photo) {
-      featuredImage.src = photo;
+  db.ref(SITE + '/featured_photo').on('snap', s => {
+    if (s.exists()) {
+      featuredImage.src = s.val();
       featuredImage.classList.remove('hidden');
       featuredPlaceholder.classList.add('hidden');
+    } else {
+      featuredImage.classList.add('hidden');
+      featuredPlaceholder.classList.remove('hidden');
     }
-  }
-
-  uploadFeaturedBtn.addEventListener('click', function(e) {
-    e.stopPropagation();
-    featuredFileInput.click();
+  });
+  uploadFeaturedBtn.addEventListener('click', function(e) { e.stopPropagation(); featuredFileInput.click(); });
+  featuredFileInput.addEventListener('change', async function() {
+    const file = this.files[0]; if (!file) return;
+    const dataUrl = await compressImage(file, 800, 0.7);
+    db.ref(SITE + '/featured_photo').set(dataUrl);
   });
 
-  featuredFileInput.addEventListener('change', function() {
-    const file = this.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(ev) {
-      setStore('featured_photo', ev.target.result);
-      loadFeatured();
-    };
-    reader.readAsDataURL(file);
-  });
-
-  loadFeatured();
-
-  // Filter tabs
   document.querySelectorAll('.filter-tab').forEach(tab => {
     tab.addEventListener('click', function() {
       document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
@@ -1090,8 +1014,7 @@ tailwind.config = {
   });
 
   momentPhotoInput.addEventListener('change', function() {
-    const file = this.files[0];
-    if (!file) return;
+    const file = this.files[0]; if (!file) return;
     const reader = new FileReader();
     reader.onload = function(ev) {
       momentPreviewImg.src = ev.target.result;
@@ -1110,35 +1033,31 @@ tailwind.config = {
     uploadMomentModal.classList.remove('hidden');
   });
 
-  publishMomentBtn.addEventListener('click', function() {
+  publishMomentBtn.addEventListener('click', async function() {
     const file = momentPhotoInput.files[0];
     if (!file) { alert('Please select a photo'); return; }
     const caption = document.getElementById('momentCaption').value.trim();
     const category = document.getElementById('momentCategory').value;
-    const reader = new FileReader();
-    reader.onload = function(ev) {
-      moments.unshift({
-        id: Date.now(),
-        photo: ev.target.result,
-        caption: caption || 'Our moment',
-        category: category,
-        likes: 0,
-        liked: false
-      });
-      setStore('moments_gallery', moments);
-      renderGallery();
-      uploadMomentModal.classList.add('hidden');
-    };
-    reader.readAsDataURL(file);
+    const dataUrl = await compressImage(file, 600, 0.7);
+    db.ref(SITE + '/moments').push({
+      photo: dataUrl, caption: caption || 'Our moment', category, likes: 0, liked: false, time: Date.now()
+    });
+    uploadMomentModal.classList.add('hidden');
+  });
+
+  db.ref(SITE + '/moments').on('value', snap => {
+    moments = [];
+    if (snap.exists()) {
+      const data = snap.val();
+      Object.keys(data).forEach(id => moments.push({ id, ...data[id] }));
+    }
+    renderGallery();
   });
 
   function renderGallery() {
     const filtered = momentFilter === 'all' ? moments : moments.filter(m => m.category === momentFilter);
     galleryGrid.innerHTML = '';
-    if (filtered.length === 0) {
-      galleryEmpty.classList.remove('hidden');
-      return;
-    }
+    if (filtered.length === 0) { galleryEmpty.classList.remove('hidden'); return; }
     galleryEmpty.classList.add('hidden');
     filtered.forEach(m => {
       const div = document.createElement('div');
@@ -1155,54 +1074,35 @@ tailwind.config = {
         </div>
         <div class="p-2 flex items-center justify-between">
           <span class="text-[9px] text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full">${m.category}</span>
-          <button class="like-moment-btn flex items-center gap-0.5 ${m.liked ? 'text-red-500' : 'text-on-surface-variant'}" data-id="${m.id}">
-            <span class="material-symbols-outlined text-sm ${m.liked ? 'fill-heart' : ''}">favorite</span>
-            <span class="text-[10px]">${m.likes}</span>
+          <button class="like-moment-btn flex items-center gap-0.5 text-on-surface-variant" data-id="${m.id}">
+            <span class="material-symbols-outlined text-sm">favorite</span>
+            <span class="text-[10px]">${m.likes || 0}</span>
           </button>
-        </div>
-      `;
+        </div>`;
       galleryGrid.appendChild(div);
     });
-
-    // Like buttons
     document.querySelectorAll('.like-moment-btn').forEach(btn => {
       btn.addEventListener('click', function() {
-        const id = parseInt(this.dataset.id);
-        const m = moments.find(x => x.id === id);
-        if (m) {
-          if (m.liked) { m.likes--; m.liked = false; }
-          else { m.likes++; m.liked = true; }
-          setStore('moments_gallery', moments);
-          renderGallery();
-        }
+        const id = this.dataset.id;
+        db.ref(SITE + '/moments/' + id + '/likes').transaction(c => (c || 0) + 1);
       });
     });
-
-    // Delete buttons
     document.querySelectorAll('.delete-moment-btn').forEach(btn => {
       btn.addEventListener('click', function() {
-        const id = parseInt(this.dataset.id);
-        if (confirm('Delete this moment?')) {
-          moments = moments.filter(x => x.id !== id);
-          setStore('moments_gallery', moments);
-          renderGallery();
-        }
+        if (confirm('Delete this moment?')) db.ref(SITE + '/moments/' + this.dataset.id).remove();
       });
     });
   }
 
-  renderGallery();
-
   // ===== WISHES =====
   const defaultWishes = [
-    { name: "Dadi Jaan", relation: "Grandmother", blessing: "May Allah bless your marriage with endless happiness, love, and barakah. You both deserve all the joy in the world.", charm: "heart", likes: 12, liked: false, time: "2 days ago" },
-    { name: "Imran & Sana", relation: "Friends", blessing: "Congratulations to the beautiful couple! May your journey together be filled with laughter, adventure, and a love that grows stronger each day.", charm: "sparkle", likes: 8, liked: false, time: "1 day ago" },
-    { name: "Zaid & Alizeh", relation: "Cousins", blessing: "Two beautiful souls, one incredible journey ahead. May Allah SWT guide you both and fill your home with peace and love.", charm: "jasmine", likes: 15, liked: false, time: "Just now" }
+    { name: "Dadi Jaan", relation: "Grandmother", blessing: "May Allah bless your marriage with endless happiness, love, and barakah. You both deserve all the joy in the world.", charm: "heart", likes: 12, time: "2 days ago" },
+    { name: "Imran & Sana", relation: "Friends", blessing: "Congratulations to the beautiful couple! May your journey together be filled with laughter, adventure, and a love that grows stronger each day.", charm: "sparkle", likes: 8, time: "1 day ago" },
+    { name: "Zaid & Alizeh", relation: "Cousins", blessing: "Two beautiful souls, one incredible journey ahead. May Allah SWT guide you both and fill your home with peace and love.", charm: "jasmine", likes: 15, time: "Just now" }
   ];
 
-  let wishes = getStore('community_wishes', defaultWishes);
+  let wishes = [];
   let selectedCharm = '';
-
   const wishName = document.getElementById('wishName');
   const wishRelation = document.getElementById('wishRelation');
   const wishBlessing = document.getElementById('wishBlessing');
@@ -1212,7 +1112,6 @@ tailwind.config = {
   const previewAuthor = document.getElementById('previewAuthor');
   const postWishBtn = document.getElementById('postWishBtn');
   const wishesWall = document.getElementById('wishesWall');
-
   const charmEmojis = { jasmine: '🌸', diamond: '💎', sparkle: '✨', heart: '❤️', letter: '💌' };
 
   document.querySelectorAll('.charm-btn').forEach(btn => {
@@ -1237,7 +1136,6 @@ tailwind.config = {
       wishPreview.classList.add('hidden');
     }
   }
-
   wishName.addEventListener('input', updatePreview);
   wishRelation.addEventListener('input', updatePreview);
   wishBlessing.addEventListener('input', updatePreview);
@@ -1247,25 +1145,31 @@ tailwind.config = {
     const rel = wishRelation.value.trim();
     const bles = wishBlessing.value.trim();
     if (!name || !bles) { alert('Please enter your name and blessing'); return; }
-    wishes.unshift({
+    db.ref(SITE + '/wishes').push({
       name, relation: rel, blessing: bles,
-      charm: selectedCharm || 'heart',
-      likes: 0, liked: false, time: 'Just now'
+      charm: selectedCharm || 'heart', likes: 0, time: Date.now()
     });
-    setStore('community_wishes', wishes);
-    renderWishes();
     wishName.value = '';
     wishRelation.value = '';
     wishBlessing.value = '';
     selectedCharm = '';
     document.querySelectorAll('.charm-btn').forEach(b => b.classList.remove('selected'));
     wishPreview.classList.add('hidden');
-    alert('Your blessing has been posted! 🎉');
+  });
+
+  db.ref(SITE + '/wishes').on('value', snap => {
+    wishes = [];
+    if (snap.exists()) {
+      const data = snap.val();
+      Object.keys(data).forEach(id => wishes.push({ id, ...data[id] }));
+    }
+    renderWishes();
   });
 
   function renderWishes() {
     wishesWall.innerHTML = '';
-    wishes.forEach((w, i) => {
+    wishes.forEach(w => {
+      const timeStr = w.time ? formatTime(w.time) : 'Just now';
       const div = document.createElement('div');
       div.className = 'bg-surface-container-lowest rounded-2xl p-4 border border-surface-container-high wish-note';
       div.innerHTML = `
@@ -1274,36 +1178,44 @@ tailwind.config = {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-1">
               <p class="font-playfair text-sm font-semibold text-on-surface">${w.name}</p>
-              <span class="text-[9px] text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full">${w.relation}</span>
+              <span class="text-[9px] text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-full">${w.relation || ''}</span>
             </div>
             <p class="text-on-surface-variant text-xs leading-relaxed italic mb-2">${w.blessing}</p>
             <div class="flex items-center justify-between">
-              <span class="text-[9px] text-outline">${w.time}</span>
-              <button class="like-wish-btn flex items-center gap-0.5 ${w.liked ? 'text-red-500' : 'text-on-surface-variant'}" data-idx="${i}">
-                <span class="material-symbols-outlined text-sm ${w.liked ? 'fill-heart' : ''}">favorite</span>
-                <span class="text-[10px]">${w.likes}</span>
-              </button>
+              <span class="text-[9px] text-outline">${timeStr}</span>
+              <div class="flex items-center gap-2">
+                <button class="like-wish-btn flex items-center gap-0.5 text-on-surface-variant" data-id="${w.id}">
+                  <span class="material-symbols-outlined text-sm">favorite</span>
+                  <span class="text-[10px]">${w.likes || 0}</span>
+                </button>
+                <button class="delete-wish-btn p-0.5 text-on-surface-variant hover:text-red-500" data-id="${w.id}">
+                  <span class="material-symbols-outlined text-sm">delete</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      `;
+        </div>`;
       wishesWall.appendChild(div);
     });
-
     document.querySelectorAll('.like-wish-btn').forEach(btn => {
       btn.addEventListener('click', function() {
-        const idx = parseInt(this.dataset.idx);
-        if (wishes[idx]) {
-          if (wishes[idx].liked) { wishes[idx].likes--; wishes[idx].liked = false; }
-          else { wishes[idx].likes++; wishes[idx].liked = true; }
-          setStore('community_wishes', wishes);
-          renderWishes();
-        }
+        db.ref(SITE + '/wishes/' + this.dataset.id + '/likes').transaction(c => (c || 0) + 1);
+      });
+    });
+    document.querySelectorAll('.delete-wish-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        if (confirm('Delete this wish?')) db.ref(SITE + '/wishes/' + this.dataset.id).remove();
       });
     });
   }
 
-  renderWishes();
+  function formatTime(ts) {
+    const diff = Date.now() - ts;
+    if (diff < 60000) return 'Just now';
+    if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+    if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+    return Math.floor(diff / 86400000) + 'd ago';
+  }
 
   // ===== RSVP BUTTONS =====
   document.getElementById('rsvpNavBtn').addEventListener('click', function() {
