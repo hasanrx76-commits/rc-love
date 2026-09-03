@@ -122,7 +122,7 @@ tailwind.config = {
       <button id="passwordBtn" class="w-full py-3 bg-white text-primary font-semibold rounded-xl hover:bg-primary-fixed transition-colors" onclick="checkPassword()">
         Enter
       </button>
-      <p id="passwordError" class="text-red-300 text-sm mt-3 hidden font-medium">Wrong password!</p>
+      <p id="passwordError" class="text-red-300 text-sm mt-3 font-medium" style="display:none;">Wrong password!</p>
     </div>
   </div>
 </div>
@@ -667,7 +667,6 @@ tailwind.config = {
       setStore('rc_love_v2_unlocked', true);
       startPetalAnimation();
     } else {
-      passwordError.classList.remove('hidden');
       passwordError.style.display = 'block';
       passwordInput.value = '';
       passwordInput.focus();
