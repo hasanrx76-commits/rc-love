@@ -723,7 +723,7 @@ tailwind.config = {
   const deleteCoverBtn = document.getElementById('deleteCoverBtn');
   const coverFileInput = document.getElementById('coverFileInput');
 
-  db.ref(SITE + '/cover_photo').on('snap', s => {
+  db.ref(SITE + '/cover_photo').on('value', s => {
     if (s.exists()) {
       coverImage.src = s.val();
       coverImage.classList.remove('hidden');
@@ -762,7 +762,7 @@ tailwind.config = {
   const saveCountdownBtn = document.getElementById('saveCountdownBtn');
 
   let countdownStart = '2025-06-15';
-  db.ref(SITE + '/countdown_start').on('snap', s => {
+  db.ref(SITE + '/countdown_start').on('value', s => {
     if (s.exists()) countdownStart = s.val();
     updateCountdown();
   });
@@ -813,7 +813,7 @@ tailwind.config = {
   ];
 
   let currentQuote = 0;
-  db.ref(SITE + '/quote_index').on('snap', s => { if (s.exists()) { currentQuote = s.val(); renderQuote(); } });
+  db.ref(SITE + '/quote_index').on('value', s => { if (s.exists()) { currentQuote = s.val(); renderQuote(); } });
   const quoteText = document.getElementById('quoteText');
   const quoteLang = document.getElementById('quoteLang');
   const quoteLikeBtn = document.getElementById('quoteLikeBtn');
@@ -855,7 +855,7 @@ tailwind.config = {
 
   const defaultLetter = "My dearest Chandni,\n\nEvery day with you is a gift I never knew I needed. Your smile lights up my darkest days, and your love gives me strength I never knew I had.\n\nYou are my best friend, my soulmate, my everything. I promise to love you endlessly, to hold your hand through every storm, and to cherish every single moment we share together.\n\nForever and always,\nRabbani";
 
-  db.ref(SITE + '/love_letter').on('snap', s => {
+  db.ref(SITE + '/love_letter').on('value', s => {
     const letter = s.exists() ? s.val() : defaultLetter;
     letterPreview.textContent = letter;
     letterText.value = letter;
@@ -885,7 +885,7 @@ tailwind.config = {
 
   let milestones = [];
 
-  db.ref(SITE + '/story_milestones').on('snap', s => {
+  db.ref(SITE + '/story_milestones').on('value', s => {
     if (s.exists()) {
       const data = s.val();
       milestones = Array.isArray(data) ? data : Object.values(data);
@@ -987,7 +987,7 @@ tailwind.config = {
   const uploadFeaturedBtn = document.getElementById('uploadFeaturedBtn');
   const featuredFileInput = document.getElementById('featuredFileInput');
 
-  db.ref(SITE + '/featured_photo').on('snap', s => {
+  db.ref(SITE + '/featured_photo').on('value', s => {
     if (s.exists()) {
       featuredImage.src = s.val();
       featuredImage.classList.remove('hidden');
